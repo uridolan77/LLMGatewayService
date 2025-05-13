@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: llm-gateway-api
+    restart: unless-stopped
+    ports:
+      - "5000:80"
+      - "5001:443"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80;https://+:443
+      - Redis__ConnectionString=redis:6379
+      - Persistence__ConnectionString=Server=db;Database=LLMGateway;User=sa;Password=${DB_PASSWORD};TrustServerCertificate=True;
+      - Providers__OpenAI__ApiKey=${OPENAI_API_KEY}
+      - Providers__Anthropic__ApiKey=${ANTHROPIC_API_KEY}
+      - Providers__Cohere__ApiKey=${COHERE_API_KEY}
+      - Providers__HuggingFace__ApiKey=${HUGGINGFACE_API_KEY}
+      - Jwt__Secret=${JWT_SECRET}
+      - ApiKeys__ApiKeys__0__Key=${API_KEY}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - db
+    networks:
+      - llm-gateway-network
+
+  redis:
+    image: redis:alpine
+    container_name: llm-gateway-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - llm-gateway-network
+
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: llm-gateway-db
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${DB_PASSWORD}
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    networks:
+      - llm-gateway-network
+
+networks:
+  llm-gateway-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  sqlserver-data:

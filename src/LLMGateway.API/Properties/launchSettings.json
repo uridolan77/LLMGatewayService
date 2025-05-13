@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "LLMGateway.API": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:52316;http://localhost:52317"
+    }
+  }
+}

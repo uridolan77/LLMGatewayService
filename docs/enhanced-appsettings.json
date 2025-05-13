@@ -1,0 +1,273 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "Microsoft.Hosting.Lifetime": "Information",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Console",
+        "Args": {
+          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}"
+        }
+      },
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/llm-gateway-.log",
+          "rollingInterval": "Day",
+          "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}"
+        }
+      }
+    ],
+    "Enrich": [ "FromLogContext", "WithMachineName", "WithThreadId" ]
+  },
+  "AllowedHosts": "*",
+  "GlobalOptions": {
+    "EnableCaching": true,
+    "CacheExpirationMinutes": 60,
+    "TrackTokenUsage": true,
+    "EnableProviderDiscovery": true,
+    "DefaultTimeoutSeconds": 30,
+    "DefaultStreamTimeoutSeconds": 120
+  },
+  "Persistence": {
+    "UseDatabase": true,
+    "DatabaseProvider": "SQLServer", 
+    "ConnectionString": "Server=(localdb)\\mssqllocaldb;Database=LLMGateway;Trusted_Connection=True;MultipleActiveResultSets=true",
+    "EnableMigrations": true,
+    "AutoMigrateOnStartup": true
+  },
+  "Routing": {
+    "EnableSmartRouting": true,
+    "EnableLoadBalancing": true,
+    "EnableLatencyOptimizedRouting": true,
+    "EnableCostOptimizedRouting": true,
+    "EnableContentBasedRouting": true,
+    "TrackRoutingDecisions": true,
+    "TrackModelMetrics": true,
+    "EnableExperimentalRouting": false,
+    "ExperimentalSamplingRate": 0.1,
+    "ExperimentalModels": [
+      "anthropic.claude-3-haiku"
+    ],
+    "ModelMappings": [
+      {
+        "ModelId": "gpt-4",
+        "TargetModelId": "openai.gpt-4-turbo"
+      },
+      {
+        "ModelId": "claude",
+        "TargetModelId": "anthropic.claude-3-sonnet"
+      }
+    ],
+    "ModelRoutingStrategies": [
+      {
+        "ModelId": "openai.gpt-4-turbo",
+        "Strategy": "QualityOptimized"
+      },
+      {
+        "ModelId": "anthropic.claude-3-opus",
+        "Strategy": "QualityOptimized"
+      },
+      {
+        "ModelId": "openai.gpt-3.5-turbo",
+        "Strategy": "LoadBalanced"
+      }
+    ]
+  },
+  "UserPreferences": {
+    "UserRoutingPreferences": [
+      {
+        "UserId": "user-123",
+        "RoutingStrategy": "CostOptimized"
+      },
+      {
+        "UserId": "user-456",
+        "RoutingStrategy": "LatencyOptimized"
+      }
+    ],
+    "UserModelPreferences": [
+      {
+        "UserId": "user-789",
+        "PreferredModelId": "anthropic.claude-3-sonnet"
+      }
+    ]
+  },
+  "Redis": {
+    "ConnectionString": "localhost:6379",
+    "InstanceName": "LLMGateway:"
+  },
+  "LLMRouting": {
+    "UseDynamicRouting": true,
+    "ModelMappings": [
+      {
+        "ModelId": "openai.gpt-4-turbo",
+        "ProviderName": "OpenAI",
+        "ProviderModelId": "gpt-4-turbo",
+        "DisplayName": "GPT-4 Turbo",
+        "ContextWindow": 128000,
+        "Properties": {
+          "TokenPriceInput": "0.01",
+          "TokenPriceOutput": "0.03"
+        }
+      },
+      {
+        "ModelId": "openai.gpt-3.5-turbo",
+        "ProviderName": "OpenAI",
+        "ProviderModelId": "gpt-3.5-turbo",
+        "DisplayName": "GPT-3.5 Turbo",
+        "ContextWindow": 16384,
+        "Properties": {
+          "TokenPriceInput": "0.0005",
+          "TokenPriceOutput": "0.0015"
+        }
+      },
+      {
+        "ModelId": "anthropic.claude-3-opus",
+        "ProviderName": "Anthropic",
+        "ProviderModelId": "claude-3-opus-20240229",
+        "DisplayName": "Claude 3 Opus",
+        "ContextWindow": 200000,
+        "Properties": {
+          "TokenPriceInput": "0.015",
+          "TokenPriceOutput": "0.075"
+        }
+      },
+      {
+        "ModelId": "anthropic.claude-3-sonnet",
+        "ProviderName": "Anthropic",
+        "ProviderModelId": "claude-3-sonnet-20240229",
+        "DisplayName": "Claude 3 Sonnet",
+        "ContextWindow": 200000,
+        "Properties": {
+          "TokenPriceInput": "0.003",
+          "TokenPriceOutput": "0.015"
+        }
+      },
+      {
+        "ModelId": "anthropic.claude-3-haiku",
+        "ProviderName": "Anthropic",
+        "ProviderModelId": "claude-3-haiku-20240307",
+        "DisplayName": "Claude 3 Haiku",
+        "ContextWindow": 200000,
+        "Properties": {
+          "TokenPriceInput": "0.00025",
+          "TokenPriceOutput": "0.00125"
+        }
+      },
+      {
+        "ModelId": "cohere.command-r",
+        "ProviderName": "Cohere",
+        "ProviderModelId": "command-r",
+        "DisplayName": "Command R",
+        "ContextWindow": 128000,
+        "Properties": {
+          "TokenPriceInput": "0.0005",
+          "TokenPriceOutput": "0.0015"
+        }
+      }
+    ]
+  },
+  "Fallbacks": {
+    "EnableFallbacks": true,
+    "MaxFallbackAttempts": 3,
+    "Rules": [
+      {
+        "ModelId": "openai.gpt-4-turbo",
+        "FallbackModels": ["openai.gpt-3.5-turbo", "anthropic.claude-3-sonnet"],
+        "ErrorCodes": ["rate_limit_exceeded", "server_error"]
+      },
+      {
+        "ModelId": "anthropic.claude-3-opus",
+        "FallbackModels": ["anthropic.claude-3-sonnet", "anthropic.claude-3-haiku"],
+        "ErrorCodes": ["rate_limit_exceeded", "server_error"]
+      },
+      {
+        "ModelId": "openai.gpt-3.5-turbo",
+        "FallbackModels": ["anthropic.claude-3-haiku", "cohere.command-r"],
+        "ErrorCodes": ["rate_limit_exceeded", "server_error"]
+      }
+    ]
+  },
+  "Telemetry": {
+    "EnableTelemetry": true,
+    "ApplicationInsightsConnectionString": "",
+    "TrackPerformance": true,
+    "TrackExceptions": true,
+    "TrackDependencies": true,
+    "EnrichWithUserInfo": true
+  },
+  "TokenUsage": {
+    "EnableTokenCounting": true,
+    "StorageProvider": "Database",
+    "DataRetentionPeriod": "90.00:00:00",
+    "EnableAlerts": true,
+    "AlertThresholdPercentage": 80
+  },
+  "RateLimiting": {
+    "TokenLimit": 100,
+    "TokensPerPeriod": 10,
+    "ReplenishmentPeriodSeconds": 1,
+    "QueueLimit": 50
+  },
+  "ApiKeys": {
+    "ApiKeys": [
+      {
+        "Id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "Key": "sk-demo-key-replace-with-secure-key",
+        "Owner": "Default User",
+        "Permissions": ["completion", "embedding", "admin"],
+        "TokenLimits": {
+          "DailyLimit": 100000,
+          "MonthlyLimit": 2000000
+        }
+      }
+    ]
+  },
+  "Jwt": {
+    "Secret": "replace-with-strong-secret-key-at-least-32-characters",
+    "Issuer": "llm-gateway",
+    "Audience": "llm-gateway-clients",
+    "ExpiryMinutes": 60
+  },
+  "Providers": {
+    "OpenAI": {
+      "ApiKey": "your-openai-api-key",
+      "ApiUrl": "https://api.openai.com/v1",
+      "OrganizationId": "",
+      "TimeoutSeconds": 30,
+      "ModelMappings": []
+    },
+    "Anthropic": {
+      "ApiKey": "your-anthropic-api-key",
+      "ApiUrl": "https://api.anthropic.com/v1",
+      "ApiVersion": "2023-06-01",
+      "TimeoutSeconds": 120,
+      "ModelMappings": []
+    },
+    "Cohere": {
+      "ApiKey": "your-cohere-api-key",
+      "ApiUrl": "https://api.cohere.ai/v1",
+      "TimeoutSeconds": 60,
+      "ModelMappings": []
+    },
+    "HuggingFace": {
+      "ApiKey": "your-huggingface-api-key",
+      "ApiUrl": "https://api-inference.huggingface.co",
+      "TimeoutSeconds": 60,
+      "ModelMappings": []
+    }
+  }
+}
