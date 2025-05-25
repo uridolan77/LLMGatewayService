@@ -212,8 +212,17 @@ public static class ServiceCollectionExtensions
     {
         // Register core services
         services.AddSingleton<Core.Interfaces.IRetryPolicyService, Core.Services.RetryPolicyService>();
-        services.AddSingleton<Core.Interfaces.ITokenCountingService, Core.Services.TokenCountingService>();
+
+        // Register enhanced services - use TikToken for better token counting
+        services.AddSingleton<Core.Interfaces.ITokenCountingService, Core.Services.TiktokenTokenCountingService>();
         services.AddSingleton<Core.Interfaces.ITokenCounterService, Core.Services.TokenCounterService>();
+
+        // Register enhanced circuit breaker service
+        services.AddSingleton<Core.Interfaces.ICircuitBreakerService, Core.Services.CircuitBreakerService>();
+
+        // Register enhanced caching service
+        services.AddSingleton<Core.Interfaces.IEnhancedCacheService, Core.Services.EnhancedCacheService>();
+
         services.AddSingleton<Core.Interfaces.IContentFilteringService, Core.Services.ContentFilteringService>();
         services.AddScoped<Core.Interfaces.IProviderService, Core.Services.ProviderService>();
 

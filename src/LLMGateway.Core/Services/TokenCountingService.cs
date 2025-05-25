@@ -14,7 +14,7 @@ public class TokenCountingService : ITokenCountingService
     private readonly ILogger<TokenCountingService> _logger;
     private readonly ILLMProviderFactory _providerFactory;
     private readonly IModelService _modelService;
-    private readonly ConcurrentDictionary<string, ITokenizer> _tokenizers = new();
+    private readonly ConcurrentDictionary<string, LLMGateway.Core.Models.Tokenization.ITokenizer> _tokenizers = new();
 
     /// <summary>
     /// Constructor
@@ -157,12 +157,12 @@ public class TokenCountingService : ITokenCountingService
         }
     }
 
-    private ITokenizer GetTokenizerForModel(string modelId)
+    private LLMGateway.Core.Models.Tokenization.ITokenizer GetTokenizerForModel(string modelId)
     {
         return _tokenizers.GetOrAdd(modelId, CreateTokenizerForModel);
     }
 
-    private ITokenizer CreateTokenizerForModel(string modelId)
+    private LLMGateway.Core.Models.Tokenization.ITokenizer CreateTokenizerForModel(string modelId)
     {
         // Create the appropriate tokenizer based on the model
         return modelId.ToLowerInvariant() switch
