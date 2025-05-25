@@ -11,42 +11,47 @@ public class CompletionResponse
     /// ID of the completion
     /// </summary>
     public string Id { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Object type
     /// </summary>
     public string Object { get; set; } = "chat.completion";
-    
+
     /// <summary>
     /// Created timestamp
     /// </summary>
     public long Created { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-    
+
     /// <summary>
     /// Model used for the completion
     /// </summary>
     public string Model { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Provider used for the completion
     /// </summary>
     public string Provider { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Choices in the completion
     /// </summary>
     public List<CompletionChoice> Choices { get; set; } = new();
-    
+
     /// <summary>
     /// Usage statistics
     /// </summary>
     public CompletionUsage Usage { get; set; } = new();
-    
+
     /// <summary>
     /// System fingerprint
     /// </summary>
     public string? SystemFingerprint { get; set; }
-    
+
+    /// <summary>
+    /// Error message if the completion failed
+    /// </summary>
+    public string? Error { get; set; }
+
     /// <summary>
     /// Additional provider-specific parameters
     /// </summary>
@@ -63,17 +68,17 @@ public class CompletionChoice
     /// Index of the choice
     /// </summary>
     public int Index { get; set; }
-    
+
     /// <summary>
     /// Message in the choice
     /// </summary>
     public Message Message { get; set; } = new();
-    
+
     /// <summary>
     /// Finish reason
     /// </summary>
     public string? FinishReason { get; set; }
-    
+
     /// <summary>
     /// Delta in a streaming response
     /// </summary>
@@ -89,12 +94,12 @@ public class CompletionUsage
     /// Prompt tokens
     /// </summary>
     public int PromptTokens { get; set; }
-    
+
     /// <summary>
     /// Completion tokens
     /// </summary>
     public int CompletionTokens { get; set; }
-    
+
     /// <summary>
     /// Total tokens
     /// </summary>

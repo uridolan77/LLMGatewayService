@@ -5,6 +5,7 @@ using LLMGateway.Core.Options;
 using LLMGateway.Core.Routing;
 using LLMGateway.Core.Services;
 using LLMGateway.Infrastructure.Caching;
+using LLMGateway.Infrastructure.HealthChecks;
 using LLMGateway.Infrastructure.Jobs;
 using LLMGateway.Infrastructure.Logging;
 using LLMGateway.Infrastructure.Monitoring.Extensions;
@@ -12,11 +13,14 @@ using LLMGateway.Infrastructure.Persistence.Extensions;
 using LLMGateway.Infrastructure.Telemetry;
 using LLMGateway.Providers.Factory;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Serilog;
+using System.IO.Compression;
 using System.Text.Json.Serialization;
 using HealthChecks.Redis;
+using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +41,36 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     });
+
+// Add MediatR for CQRS pattern
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(LLMGateway.Core.Commands.CreateCompletionCommand).Assembly);
+});
+
+// Add response compression
+builder.Services.AddResponseCompression(options =>
+{
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.EnableForHttps = true;
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+        new[] { "application/json", "text/event-stream" });
+});
+
+// Configure compression levels
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Optimal;
+});
+
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Optimal;
+});
+
+// WebSocket support is built into ASP.NET Core
+// No additional configuration needed for basic WebSocket support
 
 // Add API versioning
 builder.Services.AddApiVersioning(options =>
@@ -64,20 +98,28 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Add Swagger
+// Add Swagger with enhanced documentation
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "LLM Gateway API",
         Version = "v1",
-        Description = "A comprehensive API gateway for Language Learning Models",
+        Description = "A comprehensive API gateway for Language Learning Models with advanced features including streaming, batch processing, and real-time WebSocket support",
         Contact = new OpenApiContact
         {
             Name = "API Support",
             Email = "support@example.com"
+        },
+        License = new OpenApiLicense
+        {
+            Name = "MIT License",
+            Url = new Uri("https://opensource.org/licenses/MIT")
         }
     });
+
+    // Enable annotations for enhanced documentation
+    options.EnableAnnotations();
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -171,22 +213,26 @@ builder.Services.AddRedisCache(builder.Configuration);
 builder.Services.AddTelemetry(builder.Configuration);
 builder.Services.AddRateLimiting(builder.Configuration);
 
-// Add health checks
-builder.Services.AddHealthChecks();
+// Add enhanced health checks
+builder.Services.AddHealthChecks()
+    .AddCheck<LLMProviderHealthCheck>("llm_providers", tags: new[] { "providers", "external" });
 
 // Add database health checks if using a database
 if (builder.Configuration.GetValue<bool>("Persistence:UseDatabase"))
 {
     builder.Services.AddHealthChecks()
-        .AddDbContextCheck<LLMGateway.Infrastructure.Persistence.LLMGatewayDbContext>();
+        .AddDbContextCheck<LLMGateway.Infrastructure.Persistence.LLMGatewayDbContext>("database", tags: new[] { "database" });
 }
 
 // Add Redis health checks if configured
 if (!string.IsNullOrEmpty(builder.Configuration.GetValue<string>("Redis:ConnectionString")))
 {
     builder.Services.AddHealthChecks()
-        .AddRedis(builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "localhost:6379", "redis");
+        .AddRedis(builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "localhost:6379", "redis", tags: new[] { "cache", "external" });
 }
+
+// Add request signing options
+builder.Services.Configure<RequestSigningOptions>(builder.Configuration.GetSection("RequestSigning"));
 
 // Add JWT options
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
@@ -228,8 +274,19 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseHttpsRedirection();
+
+// Enable response compression
+app.UseResponseCompression();
+
+// Enable WebSockets (built into ASP.NET Core)
+app.UseWebSockets();
+
 app.UseSerilogRequestLogging();
 app.UseCors("DefaultPolicy");
+
+// Add request signing middleware (before authentication)
+app.UseMiddleware<RequestSigningMiddleware>();
+
 app.UseMiddleware<RequestResponseLoggingMiddleware>();
 app.UseMiddleware<ApiKeyMiddleware>();
 app.UseMiddleware<ContentFilteringMiddleware>();
