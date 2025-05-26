@@ -1,4 +1,5 @@
 using LLMGateway.Core.Exceptions;
+using LLMGateway.Core.Interfaces;
 using LLMGateway.Core.Models.Completion;
 using LLMGateway.Core.Models.Embedding;
 using LLMGateway.Core.Models.Provider;
@@ -44,20 +45,30 @@ public class HuggingFaceProvider : BaseLLMProvider
     /// <param name="httpClient">HTTP client</param>
     /// <param name="options">HuggingFace options</param>
     /// <param name="logger">Logger</param>
+    /// <param name="circuitBreakerService">Circuit breaker service</param>
+    /// <param name="tokenCountingService">Token counting service</param>
+    /// <param name="cacheService">Cache service</param>
+    /// <param name="contentFilteringService">Content filtering service</param>
+    /// <param name="metricsService">Metrics service</param>
     public HuggingFaceProvider(
         HttpClient httpClient,
         IOptions<HuggingFaceOptions> options,
-        ILogger<HuggingFaceProvider> logger)
-        : base(logger)
+        ILogger<HuggingFaceProvider> logger,
+        ICircuitBreakerService circuitBreakerService,
+        ITokenCountingService tokenCountingService,
+        IEnhancedCacheService cacheService,
+        IContentFilteringService contentFilteringService,
+        IMetricsService metricsService)
+        : base(logger, circuitBreakerService, tokenCountingService, cacheService, contentFilteringService, metricsService)
     {
         _httpClient = httpClient;
         _options = options.Value;
-        
+
         // Configure the HTTP client
         _httpClient.BaseAddress = new Uri(_options.ApiUrl);
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
         _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds);
-        
+
         // Configure JSON options
         _jsonOptions = new JsonSerializerOptions
         {
@@ -78,12 +89,12 @@ public class HuggingFaceProvider : BaseLLMProvider
             // HuggingFace doesn't have a list models endpoint for inference API, so we'll return a hardcoded list
             await Task.Delay(0).ConfigureAwait(false); // Make method truly async
             var models = new List<ModelInfo>();
-            
+
             foreach (var model in _modelEndpoints)
             {
                 var modelId = model.Key;
                 var endpoint = model.Value;
-                
+
                 models.Add(new ModelInfo
                 {
                     Id = $"huggingface.{modelId.Replace('/', '_')}",
@@ -98,7 +109,7 @@ public class HuggingFaceProvider : BaseLLMProvider
                     SupportsVision = false
                 });
             }
-            
+
             return models;
         }
         catch (Exception ex)
@@ -118,15 +129,15 @@ public class HuggingFaceProvider : BaseLLMProvider
             {
                 providerModelId = modelId.Substring("huggingface.".Length).Replace('_', '/');
             }
-            
+
             // Check if the model is in our hardcoded list
             if (!_modelEndpoints.TryGetValue(providerModelId, out var endpoint))
             {
                 throw new ProviderException(Name, $"Model {modelId} not found");
             }
-            
+
             await Task.Delay(0).ConfigureAwait(false); // Make method truly async
-            
+
             return new ModelInfo
             {
                 Id = $"huggingface.{providerModelId.Replace('/', '_')}",
@@ -150,6 +161,12 @@ public class HuggingFaceProvider : BaseLLMProvider
     /// <inheritdoc/>
     public override async Task<CompletionResponse> CreateCompletionAsync(CompletionRequest request, CancellationToken cancellationToken = default)
     {
+        return await CreateEnhancedCompletionAsync(request, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<CompletionResponse> CreateCompletionInternalAsync(CompletionRequest request, CancellationToken cancellationToken = default)
+    {
         try
         {
             // Get the model endpoint
@@ -157,29 +174,29 @@ public class HuggingFaceProvider : BaseLLMProvider
             {
                 throw new ProviderException(Name, $"Model {request.ModelId} not found");
             }
-            
+
             if (endpoint != "text-generation")
             {
                 throw new ProviderException(Name, $"Model {request.ModelId} does not support text generation");
             }
-            
+
             // Convert the request to HuggingFace format
             var huggingFaceRequest = ConvertToHuggingFaceTextGenerationRequest(request);
-            
+
             // Send the request
             var response = await _httpClient.PostAsJsonAsync($"/{request.ModelId}", huggingFaceRequest, _jsonOptions, cancellationToken).ConfigureAwait(false);
-            
+
             // Check for errors
             response.EnsureSuccessStatusCode();
-            
+
             // Parse the response
             var huggingFaceResponse = await response.Content.ReadFromJsonAsync<HuggingFaceTextGenerationResponse[]>(_jsonOptions, cancellationToken).ConfigureAwait(false);
-            
+
             if (huggingFaceResponse == null || huggingFaceResponse.Length == 0)
             {
                 throw new ProviderException(Name, "Failed to create completion: Empty response");
             }
-            
+
             // Convert the response to the standard format
             return ConvertFromHuggingFaceTextGenerationResponse(huggingFaceResponse[0], request.ModelId);
         }
@@ -191,7 +208,15 @@ public class HuggingFaceProvider : BaseLLMProvider
 
     /// <inheritdoc/>
     public override IAsyncEnumerable<CompletionResponse> CreateCompletionStreamAsync(
-        CompletionRequest request, 
+        CompletionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return CreateEnhancedCompletionStreamAsync(request, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override IAsyncEnumerable<CompletionResponse> CreateCompletionStreamInternalAsync(
+        CompletionRequest request,
         CancellationToken cancellationToken = default)
     {
         // HuggingFace Inference API doesn't support streaming, so we'll use the default implementation
@@ -208,29 +233,29 @@ public class HuggingFaceProvider : BaseLLMProvider
             {
                 throw new ProviderException(Name, $"Model {request.ModelId} not found");
             }
-            
+
             if (endpoint != "feature-extraction")
             {
                 throw new ProviderException(Name, $"Model {request.ModelId} does not support feature extraction");
             }
-            
+
             // Convert the request to HuggingFace format
             var huggingFaceRequest = ConvertToHuggingFaceFeatureExtractionRequest(request);
-            
+
             // Send the request
             var response = await _httpClient.PostAsJsonAsync($"/{request.ModelId}", huggingFaceRequest, _jsonOptions, cancellationToken).ConfigureAwait(false);
-            
+
             // Check for errors
             response.EnsureSuccessStatusCode();
-            
+
             // Parse the response
             var huggingFaceResponse = await response.Content.ReadFromJsonAsync<List<List<float>>>(_jsonOptions, cancellationToken).ConfigureAwait(false);
-            
+
             if (huggingFaceResponse == null || huggingFaceResponse.Count == 0)
             {
                 throw new ProviderException(Name, "Failed to create embedding: Empty response");
             }
-            
+
             // Convert the response to the standard format
             return ConvertFromHuggingFaceFeatureExtractionResponse(huggingFaceResponse, request.ModelId);
         }
@@ -259,7 +284,7 @@ public class HuggingFaceProvider : BaseLLMProvider
     {
         // Convert messages to a prompt
         var prompt = "";
-        
+
         foreach (var message in request.Messages)
         {
             if (message.Role == "system")
@@ -275,10 +300,10 @@ public class HuggingFaceProvider : BaseLLMProvider
                 prompt += $"<|assistant|>\n{message.Content}\n";
             }
         }
-        
+
         // Add the assistant prompt for the response
         prompt += "<|assistant|>\n";
-        
+
         return new HuggingFaceTextGenerationRequest
         {
             Inputs = prompt,
@@ -345,7 +370,7 @@ public class HuggingFaceProvider : BaseLLMProvider
     private EmbeddingResponse ConvertFromHuggingFaceFeatureExtractionResponse(List<List<float>> response, string modelId)
     {
         var embeddingData = new List<EmbeddingData>();
-        
+
         for (int i = 0; i < response.Count; i++)
         {
             embeddingData.Add(new EmbeddingData
@@ -355,7 +380,7 @@ public class HuggingFaceProvider : BaseLLMProvider
                 Embedding = response[i]
             });
         }
-        
+
         return new EmbeddingResponse
         {
             Object = "list",

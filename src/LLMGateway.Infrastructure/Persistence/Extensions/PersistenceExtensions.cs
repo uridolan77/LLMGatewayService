@@ -26,12 +26,12 @@ public static class PersistenceExtensions
     {
         var persistenceOptions = new PersistenceOptions();
         configuration.GetSection("Persistence").Bind(persistenceOptions);
-        
+
         if (!persistenceOptions.UseDatabase)
         {
             return services;
         }
-        
+
         // Add the database context
         services.AddDbContext<LLMGatewayDbContext>(options =>
         {
@@ -40,12 +40,12 @@ public static class PersistenceExtensions
                 case "sqlserver":
                     options.UseSqlServer(persistenceOptions.ConnectionString);
                     break;
-                    
+
                 case "postgresql":
                     // Use dynamic approach to avoid direct reference
                     var npgsqlMethod = typeof(DbContextOptionsBuilder)
                         .GetMethod("UseNpgsql", new[] { typeof(string) });
-                    
+
                     if (npgsqlMethod != null)
                     {
                         npgsqlMethod.Invoke(options, new object[] { persistenceOptions.ConnectionString });
@@ -55,12 +55,12 @@ public static class PersistenceExtensions
                         throw new ArgumentException("Npgsql provider not available. Please install the Npgsql.EntityFrameworkCore.PostgreSQL package.");
                     }
                     break;
-                    
+
                 case "sqlite":
                     // Use dynamic approach to avoid direct reference
                     var sqliteMethod = typeof(DbContextOptionsBuilder)
                         .GetMethod("UseSqlite", new[] { typeof(string) });
-                    
+
                     if (sqliteMethod != null)
                     {
                         sqliteMethod.Invoke(options, new object[] { persistenceOptions.ConnectionString });
@@ -70,12 +70,12 @@ public static class PersistenceExtensions
                         throw new ArgumentException("SQLite provider not available. Please install the Microsoft.EntityFrameworkCore.Sqlite package.");
                     }
                     break;
-                    
+
                 default:
                     throw new ArgumentException($"Unsupported database provider: {persistenceOptions.DatabaseProvider}");
             }
         });
-        
+
         // Register repositories
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUserRepository, UserRepository>();
@@ -89,10 +89,17 @@ public static class PersistenceExtensions
         services.AddScoped<IModelRepository, ModelRepository>();
         services.AddScoped<IProviderConfigurationRepository, ProviderConfigurationRepository>();
         services.AddScoped<IUserPermissionRepository, UserPermissionRepository>();
-        
+
+        // Register Phase 2 and Phase 3 repositories that require database
+        // These repositories are now implemented and available
+        services.AddScoped<Core.Interfaces.IPromptTemplateRepository, LLMGateway.Infrastructure.Repositories.PromptTemplateRepository>();
+        services.AddScoped<Core.Interfaces.IConversationRepository, LLMGateway.Infrastructure.Repositories.ConversationRepository>();
+        services.AddScoped<Core.Interfaces.IABTestingRepository, LLMGateway.Infrastructure.Repositories.ABTestingRepository>();
+        services.AddScoped<Core.Interfaces.IFineTuningRepository, LLMGateway.Infrastructure.Repositories.FineTuningRepository>();
+
         return services;
     }
-    
+
     /// <summary>
     /// Migrate the database
     /// </summary>
@@ -104,12 +111,12 @@ public static class PersistenceExtensions
         var dbContext = scope.ServiceProvider.GetRequiredService<LLMGatewayDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<LLMGatewayDbContext>>();
         var options = scope.ServiceProvider.GetRequiredService<IOptions<PersistenceOptions>>().Value;
-        
+
         if (!options.UseDatabase || !options.EnableMigrations)
         {
             return app;
         }
-        
+
         try
         {
             logger.LogInformation("Applying database migrations");
@@ -121,10 +128,10 @@ public static class PersistenceExtensions
             logger.LogError(ex, "An error occurred while applying database migrations");
             throw;
         }
-        
+
         return app;
     }
-    
+
     /// <summary>
     /// Seed initial data
     /// </summary>
@@ -136,16 +143,16 @@ public static class PersistenceExtensions
         var dbContext = scope.ServiceProvider.GetRequiredService<LLMGatewayDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<LLMGatewayDbContext>>();
         var options = scope.ServiceProvider.GetRequiredService<IOptions<PersistenceOptions>>().Value;
-        
+
         if (!options.UseDatabase || !options.EnableSeeding)
         {
             return app;
         }
-        
+
         try
         {
             logger.LogInformation("Seeding initial data");
-            
+
             // Seed admin user if no users exist
             if (!dbContext.Users.Any())
             {
@@ -157,10 +164,10 @@ public static class PersistenceExtensions
                     IsActive = true,
                     CreatedAt = DateTimeOffset.UtcNow
                 };
-                
+
                 dbContext.Users.Add(adminUser);
                 dbContext.SaveChanges();
-                
+
                 // Create an API key for the admin user
                 var apiKey = new Entities.ApiKey
                 {
@@ -173,9 +180,9 @@ public static class PersistenceExtensions
                     DailyTokenLimit = 100000,
                     MonthlyTokenLimit = 3000000
                 };
-                
+
                 dbContext.ApiKeys.Add(apiKey);
-                
+
                 // Add user permissions
                 var adminPermission = new Entities.UserPermission
                 {
@@ -184,13 +191,13 @@ public static class PersistenceExtensions
                     IsGranted = true,
                     GrantedAt = DateTimeOffset.UtcNow
                 };
-                
+
                 dbContext.UserPermissions.Add(adminPermission);
                 dbContext.SaveChanges();
-                
+
                 logger.LogInformation("Created admin user with API key: {ApiKey}", apiKey.Key);
             }
-            
+
             // Seed default models if no models exist
             if (!dbContext.Models.Any())
             {
@@ -243,13 +250,13 @@ public static class PersistenceExtensions
                         CreatedAt = DateTimeOffset.UtcNow
                     }
                 };
-                
+
                 dbContext.Models.AddRange(defaultModels);
                 dbContext.SaveChanges();
-                
+
                 logger.LogInformation("Created default model definitions");
             }
-            
+
             // Seed provider configurations if none exist
             if (!dbContext.ProviderConfigurations.Any())
             {
@@ -278,13 +285,13 @@ public static class PersistenceExtensions
                         LastModified = DateTimeOffset.UtcNow
                     }
                 };
-                
+
                 dbContext.ProviderConfigurations.AddRange(defaultProviders);
                 dbContext.SaveChanges();
-                
+
                 logger.LogInformation("Created default provider configurations");
             }
-            
+
             // Seed default settings if none exist
             if (!dbContext.Settings.Any())
             {
@@ -315,13 +322,13 @@ public static class PersistenceExtensions
                         LastModified = DateTimeOffset.UtcNow
                     }
                 };
-                
+
                 dbContext.Settings.AddRange(defaultSettings);
                 dbContext.SaveChanges();
-                
+
                 logger.LogInformation("Created default application settings");
             }
-            
+
             logger.LogInformation("Initial data seeded successfully");
         }
         catch (Exception ex)
@@ -329,7 +336,7 @@ public static class PersistenceExtensions
             logger.LogError(ex, "An error occurred while seeding initial data");
             throw;
         }
-        
+
         return app;
     }
 }

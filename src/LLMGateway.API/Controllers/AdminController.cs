@@ -1,6 +1,10 @@
 using LLMGateway.Core.Features.TokenUsage.Queries;
 using LLMGateway.Core.Interfaces;
 using LLMGateway.Core.Models.TokenUsage;
+using LLMGateway.Core.Models.Analytics;
+using LLMGateway.Core.Models.Cost;
+using LLMGateway.Core.Models.FineTuning;
+using LLMGateway.Core.Models.SDK;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace LLMGateway.API.Controllers;
 
 /// <summary>
-/// Controller for admin operations
+/// Enhanced admin controller with Phase 3 capabilities
 /// </summary>
 [ApiVersion("1.0")]
 [Authorize(Policy = "AdminAccess")]
@@ -18,6 +22,10 @@ public class AdminController : ControllerBase
     private readonly IMediator _mediator;
     private readonly ILLMProviderFactory _providerFactory;
     private readonly ITokenUsageService _tokenUsageService;
+    private readonly IAdvancedAnalyticsService _analyticsService;
+    private readonly ICostManagementService _costManagementService;
+    private readonly IFineTuningService _fineTuningService;
+    private readonly ISDKManagementService _sdkManagementService;
     private readonly ILogger<AdminController> _logger;
 
     /// <summary>
@@ -26,16 +34,28 @@ public class AdminController : ControllerBase
     /// <param name="mediator">Mediator</param>
     /// <param name="providerFactory">Provider factory</param>
     /// <param name="tokenUsageService">Token usage service</param>
+    /// <param name="analyticsService">Advanced analytics service</param>
+    /// <param name="costManagementService">Cost management service</param>
+    /// <param name="fineTuningService">Fine-tuning service</param>
+    /// <param name="sdkManagementService">SDK management service</param>
     /// <param name="logger">Logger</param>
     public AdminController(
         IMediator mediator,
         ILLMProviderFactory providerFactory,
         ITokenUsageService tokenUsageService,
+        IAdvancedAnalyticsService analyticsService,
+        ICostManagementService costManagementService,
+        IFineTuningService fineTuningService,
+        ISDKManagementService sdkManagementService,
         ILogger<AdminController> logger)
     {
         _mediator = mediator;
         _providerFactory = providerFactory;
         _tokenUsageService = tokenUsageService;
+        _analyticsService = analyticsService;
+        _costManagementService = costManagementService;
+        _fineTuningService = fineTuningService;
+        _sdkManagementService = sdkManagementService;
         _logger = logger;
     }
 
@@ -243,6 +263,215 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get dashboard summary");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    // Phase 3 Advanced Analytics Endpoints
+
+    /// <summary>
+    /// Get advanced analytics dashboard
+    /// </summary>
+    /// <param name="request">Analytics request</param>
+    /// <returns>Advanced analytics</returns>
+    [HttpPost("analytics/advanced")]
+    [ProducesResponseType(typeof(UsageAnalytics), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetAdvancedAnalytics([FromBody] AnalyticsRequest request)
+    {
+        try
+        {
+            var analytics = await _analyticsService.GetUsageAnalyticsAsync(request);
+            return Ok(analytics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get advanced analytics");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get real-time dashboard data
+    /// </summary>
+    /// <returns>Real-time dashboard</returns>
+    [HttpGet("dashboard/realtime")]
+    [ProducesResponseType(typeof(RealTimeDashboard), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetRealTimeDashboard()
+    {
+        try
+        {
+            var dashboard = await _analyticsService.GetRealTimeDashboardAsync();
+            return Ok(dashboard);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get real-time dashboard");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get cost analytics
+    /// </summary>
+    /// <param name="request">Cost analytics request</param>
+    /// <returns>Cost analytics</returns>
+    [HttpPost("analytics/cost")]
+    [ProducesResponseType(typeof(CostAnalytics), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetCostAnalytics([FromBody] CostAnalyticsRequest request)
+    {
+        try
+        {
+            var analytics = await _analyticsService.GetCostAnalyticsAsync(request);
+            return Ok(analytics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost analytics");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get performance analytics
+    /// </summary>
+    /// <param name="request">Performance analytics request</param>
+    /// <returns>Performance analytics</returns>
+    [HttpPost("analytics/performance")]
+    [ProducesResponseType(typeof(PerformanceAnalytics), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetPerformanceAnalytics([FromBody] PerformanceAnalyticsRequest request)
+    {
+        try
+        {
+            var analytics = await _analyticsService.GetPerformanceAnalyticsAsync(request);
+            return Ok(analytics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get performance analytics");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Detect anomalies
+    /// </summary>
+    /// <param name="request">Anomaly detection request</param>
+    /// <returns>Anomaly detection results</returns>
+    [HttpPost("analytics/anomalies")]
+    [ProducesResponseType(typeof(AnomalyDetectionResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DetectAnomalies([FromBody] AnomalyDetectionRequest request)
+    {
+        try
+        {
+            var result = await _analyticsService.DetectAnomaliesAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to detect anomalies");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    // Phase 3 Advanced Cost Management Endpoints
+
+    /// <summary>
+    /// Get cost optimization recommendations
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <param name="timeframeDays">Timeframe in days</param>
+    /// <returns>Cost optimization recommendations</returns>
+    [HttpGet("cost/optimization/{userId}")]
+    [ProducesResponseType(typeof(CostOptimizationRecommendations), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetCostOptimizationRecommendations(string userId, [FromQuery] int timeframeDays = 30)
+    {
+        try
+        {
+            var timeframe = TimeSpan.FromDays(timeframeDays);
+            var recommendations = await _costManagementService.GetCostOptimizationRecommendationsAsync(userId, timeframe);
+            return Ok(recommendations);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost optimization recommendations for user {UserId}", userId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get cost forecast
+    /// </summary>
+    /// <param name="request">Cost forecast request</param>
+    /// <returns>Cost forecast</returns>
+    [HttpPost("cost/forecast")]
+    [ProducesResponseType(typeof(LLMGateway.Core.Models.Cost.CostForecast), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetCostForecast([FromBody] CostForecastRequest request)
+    {
+        try
+        {
+            var forecast = await _costManagementService.GetCostForecastAsync(request, "admin");
+            return Ok(forecast);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost forecast");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get cost anomalies
+    /// </summary>
+    /// <param name="request">Cost anomaly detection request</param>
+    /// <returns>Cost anomalies</returns>
+    [HttpPost("cost/anomalies")]
+    [ProducesResponseType(typeof(CostAnomalyDetectionResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DetectCostAnomalies([FromBody] CostAnomalyDetectionRequest request)
+    {
+        try
+        {
+            var result = await _costManagementService.DetectCostAnomaliesAsync(request, "admin");
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to detect cost anomalies");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get real-time cost data
+    /// </summary>
+    /// <returns>Real-time cost data</returns>
+    [HttpGet("cost/realtime")]
+    [ProducesResponseType(typeof(RealTimeCostData), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetRealTimeCostData()
+    {
+        try
+        {
+            var costData = await _costManagementService.GetRealTimeCostDataAsync("admin");
+            return Ok(costData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get real-time cost data");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
         }
     }

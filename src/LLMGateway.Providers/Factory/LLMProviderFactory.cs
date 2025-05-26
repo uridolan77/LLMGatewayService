@@ -62,32 +62,36 @@ public class LLMProviderFactory : ILLMProviderFactory
 
         var providers = new List<ILLMProvider>();
 
+        // Create a service scope to resolve scoped services
+        using var scope = _serviceProvider.CreateScope();
+        var scopedServiceProvider = scope.ServiceProvider;
+
         // Get all registered providers
-        var openAIProvider = _serviceProvider.GetService<OpenAIProvider>();
+        var openAIProvider = scopedServiceProvider.GetService<OpenAIProvider>();
         if (openAIProvider != null)
         {
             providers.Add(openAIProvider);
         }
 
-        var anthropicProvider = _serviceProvider.GetService<AnthropicProvider>();
+        var anthropicProvider = scopedServiceProvider.GetService<AnthropicProvider>();
         if (anthropicProvider != null)
         {
             providers.Add(anthropicProvider);
         }
 
-        var cohereProvider = _serviceProvider.GetService<CohereProvider>();
+        var cohereProvider = scopedServiceProvider.GetService<CohereProvider>();
         if (cohereProvider != null)
         {
             providers.Add(cohereProvider);
         }
 
-        var huggingFaceProvider = _serviceProvider.GetService<HuggingFaceProvider>();
+        var huggingFaceProvider = scopedServiceProvider.GetService<HuggingFaceProvider>();
         if (huggingFaceProvider != null)
         {
             providers.Add(huggingFaceProvider);
         }
 
-        var azureOpenAIProvider = _serviceProvider.GetService<AzureOpenAIProvider>();
+        var azureOpenAIProvider = scopedServiceProvider.GetService<AzureOpenAIProvider>();
         if (azureOpenAIProvider != null)
         {
             providers.Add(azureOpenAIProvider);

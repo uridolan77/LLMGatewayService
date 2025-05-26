@@ -188,7 +188,7 @@ builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
 builder.Services.AddScoped<IModelService, ModelService>();
 
 // Add enhanced core services
-builder.Services.AddCoreServices();
+builder.Services.AddCoreServices(builder.Configuration);
 
 // Add persistence
 builder.Services.AddPersistence(builder.Configuration);
@@ -240,7 +240,7 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 // Add authentication and authorization
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddAuthorizationPolicies();
-builder.Services.AddAuthServices();
+builder.Services.AddAuthServices(builder.Configuration);
 
 // Configure providers
 builder.Services.AddLLMProviders(builder.Configuration);

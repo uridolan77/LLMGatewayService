@@ -393,4 +393,211 @@ public class CostRepository : ICostRepository
             throw;
         }
     }
+
+    /// <inheritdoc/>
+    public async Task<Core.Models.Cost.CostCenter> CreateCostCenterAsync(Core.Models.Cost.CostCenter costCenter)
+    {
+        try
+        {
+            // For now, return the same object as we don't have a CostCenter entity yet
+            // In a real implementation, you would create the entity and save to database
+            _logger.LogInformation("Creating cost center {CostCenterId} for user {UserId}", costCenter.Id, costCenter.OwnerUserId);
+
+            // Simulate database save
+            await Task.Delay(10);
+
+            return costCenter;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create cost center {CostCenterId}", costCenter.Id);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<Core.Models.Cost.CostCenter>> GetCostCentersAsync(string userId)
+    {
+        try
+        {
+            // For now, return mock data as we don't have a CostCenter entity yet
+            // In a real implementation, you would query the database
+            _logger.LogInformation("Getting cost centers for user {UserId}", userId);
+
+            await Task.Delay(10);
+
+            return new List<Core.Models.Cost.CostCenter>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = "Development",
+                    Description = "Development team cost center",
+                    OwnerUserId = userId,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                },
+                new()
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = "Production",
+                    Description = "Production environment cost center",
+                    OwnerUserId = userId,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost centers for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<Core.Models.Cost.CostAlert> CreateCostAlertAsync(Core.Models.Cost.CostAlert alert)
+    {
+        try
+        {
+            // For now, return the same object as we don't have a CostAlert entity yet
+            // In a real implementation, you would create the entity and save to database
+            _logger.LogInformation("Creating cost alert {AlertId} for user {UserId}", alert.Id, alert.UserId);
+
+            // Simulate database save
+            await Task.Delay(10);
+
+            return alert;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create cost alert {AlertId}", alert.Id);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<Core.Models.Cost.CostAlert>> GetCostAlertsAsync(string userId)
+    {
+        try
+        {
+            // For now, return mock data as we don't have a CostAlert entity yet
+            // In a real implementation, you would query the database
+            _logger.LogInformation("Getting cost alerts for user {UserId}", userId);
+
+            await Task.Delay(10);
+
+            return new List<Core.Models.Cost.CostAlert>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = "Monthly Budget Alert",
+                    Type = "percentage",
+                    UserId = userId,
+                    ThresholdPercentage = 80,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost alerts for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<Core.Models.Cost.CostAlert>> GetCostAlertsAsync(string userId, string status)
+    {
+        try
+        {
+            // For now, return filtered mock data
+            _logger.LogInformation("Getting cost alerts for user {UserId} with status {Status}", userId, status);
+
+            var allAlerts = await GetCostAlertsAsync(userId);
+
+            return status.ToLowerInvariant() switch
+            {
+                "active" => allAlerts.Where(a => a.IsActive),
+                "inactive" => allAlerts.Where(a => !a.IsActive),
+                "true" => allAlerts.Where(a => a.IsActive),
+                "false" => allAlerts.Where(a => !a.IsActive),
+                _ => allAlerts
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost alerts for user {UserId} with status {Status}", userId, status);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<Core.Models.Cost.CostAlert?> GetCostAlertAsync(string alertId)
+    {
+        try
+        {
+            // For now, return mock data
+            _logger.LogInformation("Getting cost alert {AlertId}", alertId);
+
+            await Task.Delay(10);
+
+            return new Core.Models.Cost.CostAlert
+            {
+                Id = alertId,
+                Name = "Monthly Budget Alert",
+                Type = "percentage",
+                UserId = "user-123",
+                ThresholdPercentage = 80,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost alert {AlertId}", alertId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<Core.Models.Cost.CostAlert> UpdateCostAlertAsync(Core.Models.Cost.CostAlert alert)
+    {
+        try
+        {
+            // For now, return the same object
+            _logger.LogInformation("Updating cost alert {AlertId}", alert.Id);
+
+            // Simulate database update
+            await Task.Delay(10);
+            // Note: CostAlert model doesn't have UpdatedAt property
+
+            return alert;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update cost alert {AlertId}", alert.Id);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task DeleteCostAlertAsync(string alertId)
+    {
+        try
+        {
+            // For now, just log the operation
+            _logger.LogInformation("Deleting cost alert {AlertId}", alertId);
+
+            // Simulate database delete
+            await Task.Delay(10);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete cost alert {AlertId}", alertId);
+            throw;
+        }
+    }
 }

@@ -242,7 +242,7 @@ public class CostManagementService : ICostManagementService
             var breakdown = new List<CostBreakdown>();
             foreach (var (key, costUsd, tokens) in summary)
             {
-                var percentage = totalCostUsd > 0 ? (decimal)costUsd / totalCostUsd * 100 : 0;
+                var percentage = totalCostUsd > 0 ? (double)((decimal)costUsd / totalCostUsd * 100) : 0;
 
                 breakdown.Add(new CostBreakdown
                 {
@@ -830,6 +830,756 @@ public class CostManagementService : ICostManagementService
         }
 
         return nextReset;
+    }
+
+    /// <inheritdoc/>
+    public async Task<AdvancedCostAnalytics> GetAdvancedCostAnalyticsAsync(AdvancedCostAnalyticsRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting advanced cost analytics for user {UserId}", userId);
+
+            // This would typically query a comprehensive analytics database
+            // For now, return a simulated response
+            var analytics = new AdvancedCostAnalytics
+            {
+                TotalCost = 1250.75m,
+                Currency = request.Currency,
+                Trends = new CostTrends
+                {
+                    PeriodOverPeriodChange = 125.50m,
+                    PeriodOverPeriodPercentageChange = 11.2,
+                    TrendDirection = "increasing",
+                    AverageDailyCost = 41.69m,
+                    PeakCostDay = DateTime.UtcNow.AddDays(-5),
+                    PeakCostAmount = 89.45m,
+                    CostVolatility = 15.3
+                },
+                BreakdownByDimension = new Dictionary<string, CostBreakdown>
+                {
+                    ["provider"] = new CostBreakdown
+                    {
+                        TotalCost = 1250.75m,
+                        Currency = request.Currency,
+                        BreakdownByDimension = new Dictionary<string, List<CostBreakdownItem>>
+                        {
+                            ["provider"] = new List<CostBreakdownItem>
+                            {
+                                new() { DimensionValue = "OpenAI", Cost = 750.45m, PercentageOfTotal = 60.0 },
+                                new() { DimensionValue = "Anthropic", Cost = 350.20m, PercentageOfTotal = 28.0 },
+                                new() { DimensionValue = "Cohere", Cost = 150.10m, PercentageOfTotal = 12.0 }
+                            }
+                        }
+                    }
+                },
+                EfficiencyMetrics = new CostEfficiencyMetrics
+                {
+                    CostPerRequest = 0.125m,
+                    CostPerToken = 0.00002m,
+                    CostPerSuccessfulRequest = 0.127m,
+                    EfficiencyScore = 85.5
+                }
+            };
+
+            if (request.IncludeForecast)
+            {
+                analytics.Forecast = new CostForecast
+                {
+                    ForecastStart = DateTime.UtcNow,
+                    ForecastEnd = DateTime.UtcNow.AddDays(30),
+                    PredictedTotalCost = 1400.00m,
+                    ConfidenceLevel = 0.85,
+                    Methodology = "Linear regression with seasonal adjustments"
+                };
+            }
+
+            return analytics;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get advanced cost analytics for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostOptimizationRecommendations> GetCostOptimizationRecommendationsAsync(string userId, TimeSpan period)
+    {
+        try
+        {
+            _logger.LogInformation("Getting cost optimization recommendations for user {UserId}", userId);
+
+            // This would typically analyze usage patterns and costs
+            // For now, return simulated recommendations
+            var recommendations = new CostOptimizationRecommendations
+            {
+                TotalPotentialSavings = 187.50m,
+                GeneratedAt = DateTime.UtcNow,
+                Recommendations = new List<CostOptimizationRecommendation>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Title = "Switch to more cost-effective models",
+                        Description = "Consider using GPT-3.5-turbo instead of GPT-4 for routine tasks",
+                        Category = "Model Selection",
+                        PotentialSavings = 125.00m,
+                        SavingsPercentage = 15.5,
+                        ImplementationEffort = "low",
+                        Priority = "high",
+                        ImplementationSteps = new List<string>
+                        {
+                            "Identify routine tasks currently using GPT-4",
+                            "Test GPT-3.5-turbo performance on sample tasks",
+                            "Gradually migrate suitable workloads"
+                        }
+                    },
+                    new()
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Title = "Implement request caching",
+                        Description = "Cache similar requests to reduce API calls",
+                        Category = "Caching",
+                        PotentialSavings = 62.50m,
+                        SavingsPercentage = 8.2,
+                        ImplementationEffort = "medium",
+                        Priority = "medium",
+                        ImplementationSteps = new List<string>
+                        {
+                            "Implement Redis caching layer",
+                            "Configure cache TTL policies",
+                            "Monitor cache hit rates"
+                        }
+                    }
+                },
+                QuickWins = new List<CostOptimizationRecommendation>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Title = "Optimize prompt length",
+                        Description = "Reduce unnecessary tokens in prompts",
+                        Category = "Prompt Optimization",
+                        PotentialSavings = 25.00m,
+                        SavingsPercentage = 3.3,
+                        ImplementationEffort = "low",
+                        Priority = "medium"
+                    }
+                }
+            };
+
+            return recommendations;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost optimization recommendations for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostForecast> GetCostForecastAsync(CostForecastRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting cost forecast for user {UserId}", userId);
+
+            // This would typically use machine learning models for forecasting
+            // For now, return a simulated forecast
+            var forecast = new CostForecast
+            {
+                ForecastStart = request.ForecastStart,
+                ForecastEnd = request.ForecastEnd,
+                PredictedTotalCost = 1400.00m,
+                ConfidenceLevel = 0.85,
+                Methodology = request.ForecastModel,
+                FactorsConsidered = new List<string>
+                {
+                    "Historical usage patterns",
+                    "Seasonal trends",
+                    "Model pricing changes",
+                    "Usage growth rate"
+                },
+                DailyForecasts = new List<CostForecastPoint>()
+            };
+
+            // Generate daily forecast points
+            var currentDate = request.ForecastStart;
+            var dailyAverage = forecast.PredictedTotalCost / (decimal)(request.ForecastEnd - request.ForecastStart).TotalDays;
+
+            while (currentDate <= request.ForecastEnd)
+            {
+                var variance = (decimal)(new Random().NextDouble() * 0.2 - 0.1); // ±10% variance
+                var dailyCost = dailyAverage * (1 + variance);
+
+                forecast.DailyForecasts.Add(new CostForecastPoint
+                {
+                    Date = currentDate,
+                    PredictedCost = dailyCost,
+                    LowerBound = dailyCost * 0.85m,
+                    UpperBound = dailyCost * 1.15m,
+                    Confidence = 0.85
+                });
+
+                currentDate = currentDate.AddDays(1);
+            }
+
+            return forecast;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost forecast for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<decimal> GetTotalCostAsync(string userId, DateTime startDate, DateTime endDate)
+    {
+        try
+        {
+            var (totalCost, _) = await _repository.GetTotalCostAsync(
+                userId, startDate, endDate, null, null, null, null, null);
+            return totalCost;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get total cost for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostAlert> CreateCostAlertAsync(CreateCostAlertRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Creating cost alert for user {UserId}", userId);
+
+            var alert = new CostAlert
+            {
+                Id = Guid.NewGuid().ToString(),
+                UserId = userId,
+                Name = request.Name,
+                Type = request.Type,
+                ThresholdAmount = request.ThresholdAmount,
+                ThresholdPercentage = request.ThresholdPercentage,
+                TimePeriod = request.TimePeriod,
+                IsActive = true,
+                NotificationChannels = request.NotificationChannels,
+                CreatedAt = DateTime.UtcNow,
+                TriggerCount = 0
+            };
+
+            return await _repository.CreateCostAlertAsync(alert);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create cost alert for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<CostAlert>> GetCostAlertsAsync(string userId, bool? isActive = null)
+    {
+        try
+        {
+            _logger.LogInformation("Getting cost alerts for user {UserId}", userId);
+            return await _repository.GetCostAlertsAsync(userId, isActive?.ToString() ?? "all");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost alerts for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostAlert> UpdateCostAlertAsync(string alertId, UpdateCostAlertRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Updating cost alert {AlertId} for user {UserId}", alertId, userId);
+
+            var alert = await _repository.GetCostAlertAsync(alertId);
+            if (alert == null || alert.UserId != userId)
+            {
+                throw new NotFoundException($"Cost alert {alertId} not found");
+            }
+
+            if (request.Name != null) alert.Name = request.Name;
+            if (request.ThresholdAmount.HasValue) alert.ThresholdAmount = request.ThresholdAmount;
+            if (request.ThresholdPercentage.HasValue) alert.ThresholdPercentage = request.ThresholdPercentage;
+            if (request.IsActive.HasValue) alert.IsActive = request.IsActive.Value;
+            if (request.NotificationChannels != null) alert.NotificationChannels = request.NotificationChannels;
+
+            return await _repository.UpdateCostAlertAsync(alert);
+        }
+        catch (Exception ex) when (ex is not NotFoundException)
+        {
+            _logger.LogError(ex, "Failed to update cost alert {AlertId} for user {UserId}", alertId, userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task DeleteCostAlertAsync(string alertId, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Deleting cost alert {AlertId} for user {UserId}", alertId, userId);
+
+            var alert = await _repository.GetCostAlertAsync(alertId);
+            if (alert == null || alert.UserId != userId)
+            {
+                throw new NotFoundException($"Cost alert {alertId} not found");
+            }
+
+            await _repository.DeleteCostAlertAsync(alertId);
+        }
+        catch (Exception ex) when (ex is not NotFoundException)
+        {
+            _logger.LogError(ex, "Failed to delete cost alert {AlertId} for user {UserId}", alertId, userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostAnomalyDetectionResult> DetectCostAnomaliesAsync(CostAnomalyDetectionRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Detecting cost anomalies for user {UserId}", userId);
+
+            // This would typically use machine learning algorithms for anomaly detection
+            // For now, return simulated results
+            var result = new CostAnomalyDetectionResult
+            {
+                Anomalies = new List<CostAnomaly>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Date = DateTime.UtcNow.AddDays(-2),
+                        ActualCost = 150.75m,
+                        ExpectedCost = 45.20m,
+                        AnomalyScore = 0.85,
+                        Severity = "high",
+                        Description = "Unusual spike in API usage detected",
+                        PotentialCauses = new List<string>
+                        {
+                            "Increased batch processing",
+                            "New application deployment",
+                            "Possible API abuse"
+                        }
+                    }
+                },
+                Summary = new CostAnomalySummary
+                {
+                    TotalAnomalies = 1,
+                    HighSeverityAnomalies = 1,
+                    MediumSeverityAnomalies = 0,
+                    LowSeverityAnomalies = 0,
+                    TotalExcessCost = 105.55m,
+                    AverageAnomalyScore = 0.85
+                },
+                Recommendations = new List<string>
+                {
+                    "Review recent API usage patterns",
+                    "Check for unauthorized access",
+                    "Consider implementing rate limiting"
+                }
+            };
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to detect cost anomalies for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostBreakdown> GetCostBreakdownAsync(CostBreakdownRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting cost breakdown for user {UserId}", userId);
+
+            // This would typically query the cost database with grouping
+            // For now, return simulated breakdown
+            var breakdown = new CostBreakdown
+            {
+                TotalCost = 1250.75m,
+                Currency = request.Currency,
+                BreakdownByDimension = new Dictionary<string, List<CostBreakdownItem>>
+                {
+                    [request.GroupBy] = new List<CostBreakdownItem>
+                    {
+                        new() { DimensionValue = "OpenAI", Cost = 750.45m, PercentageOfTotal = 60.0 },
+                        new() { DimensionValue = "Anthropic", Cost = 350.20m, PercentageOfTotal = 28.0 },
+                        new() { DimensionValue = "Cohere", Cost = 150.10m, PercentageOfTotal = 12.0 }
+                    }
+                }
+            };
+
+            return breakdown;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost breakdown for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostTrends> GetCostTrendsAsync(CostTrendsRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting cost trends for user {UserId}", userId);
+
+            // This would typically analyze historical cost data
+            // For now, return simulated trends
+            var trends = new CostTrends
+            {
+                PeriodOverPeriodChange = 125.50m,
+                PeriodOverPeriodPercentageChange = 11.2,
+                TrendDirection = "increasing",
+                AverageDailyCost = 41.69m,
+                PeakCostDay = DateTime.UtcNow.AddDays(-5),
+                PeakCostAmount = 89.45m,
+                CostVolatility = 15.3
+            };
+
+            return trends;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost trends for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ExportData> ExportCostDataAsync(ExportCostDataRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Exporting cost data for user {UserId}", userId);
+
+            // This would typically generate and export the actual data
+            // For now, return simulated export info
+            var exportData = new ExportData
+            {
+                Id = Guid.NewGuid().ToString(),
+                FileName = $"cost-export-{DateTime.UtcNow:yyyyMMdd-HHmmss}.{request.Format.ToString().ToLower()}",
+                DownloadUrl = $"/api/exports/{Guid.NewGuid()}",
+                FileSizeBytes = 1024 * 50, // 50KB
+                Format = request.Format,
+                GeneratedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                RecordCount = 1500,
+                Status = "completed",
+                ProgressPercentage = 100.0
+            };
+
+            return exportData;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export cost data for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostEfficiencyMetrics> GetCostEfficiencyMetricsAsync(CostEfficiencyRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting cost efficiency metrics for user {UserId}", userId);
+
+            // This would typically calculate efficiency metrics from actual data
+            // For now, return simulated metrics
+            var metrics = new CostEfficiencyMetrics
+            {
+                CostPerRequest = 0.125m,
+                CostPerToken = 0.00002m,
+                CostPerSuccessfulRequest = 0.127m,
+                EfficiencyScore = 85.5,
+                BenchmarkComparison = new EfficiencyBenchmark
+                {
+                    BenchmarkName = "Industry Average",
+                    YourEfficiencyScore = 85.5,
+                    BenchmarkEfficiencyScore = 75.0,
+                    PerformanceVsBenchmark = 14.0,
+                    RankingPercentile = 78.5
+                },
+                EfficiencyTrends = new List<EfficiencyTrendPoint>
+                {
+                    new() { Date = DateTime.UtcNow.AddDays(-30), EfficiencyScore = 82.1 },
+                    new() { Date = DateTime.UtcNow.AddDays(-15), EfficiencyScore = 84.3 },
+                    new() { Date = DateTime.UtcNow, EfficiencyScore = 85.5 }
+                },
+                OptimizationOpportunities = new List<string>
+                {
+                    "Implement request caching to reduce redundant API calls",
+                    "Optimize prompt engineering to reduce token usage",
+                    "Consider using more cost-effective models for routine tasks"
+                }
+            };
+
+            return metrics;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost efficiency metrics for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<ProviderCostComparison> GetProviderCostComparisonAsync(ProviderCostComparisonRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting provider cost comparison for user {UserId}", userId);
+
+            // This would typically analyze costs across providers
+            // For now, return simulated comparison
+            var comparison = new ProviderCostComparison
+            {
+                ComparisonPeriod = new DateRange
+                {
+                    StartDate = request.StartDate ?? DateTime.UtcNow.AddDays(-30),
+                    EndDate = request.EndDate ?? DateTime.UtcNow
+                },
+                ProviderComparisons = new List<ProviderCostData>
+                {
+                    new()
+                    {
+                        ProviderName = "OpenAI",
+                        TotalCost = 750.45m,
+                        RequestCount = 5000,
+                        TokenCount = 2500000,
+                        AverageCostPerRequest = 0.15m,
+                        AverageCostPerToken = 0.0003m,
+                        MarketShare = 60.0
+                    },
+                    new()
+                    {
+                        ProviderName = "Anthropic",
+                        TotalCost = 350.20m,
+                        RequestCount = 2800,
+                        TokenCount = 1400000,
+                        AverageCostPerRequest = 0.125m,
+                        AverageCostPerToken = 0.00025m,
+                        MarketShare = 28.0
+                    },
+                    new()
+                    {
+                        ProviderName = "Cohere",
+                        TotalCost = 150.10m,
+                        RequestCount = 1500,
+                        TokenCount = 750000,
+                        AverageCostPerRequest = 0.10m,
+                        AverageCostPerToken = 0.0002m,
+                        MarketShare = 12.0
+                    }
+                },
+                CostSavingsOpportunities = new List<CostSavingsOpportunity>
+                {
+                    new()
+                    {
+                        Description = "Switch routine tasks from OpenAI to Cohere",
+                        PotentialSavings = 125.00m,
+                        SavingsPercentage = 10.0,
+                        RiskLevel = "low",
+                        ImplementationEffort = "medium"
+                    }
+                },
+                Recommendations = new List<string>
+                {
+                    "Consider diversifying across providers to optimize costs",
+                    "Test Cohere for routine tasks to reduce overall costs",
+                    "Monitor provider pricing changes regularly"
+                }
+            };
+
+            return comparison;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get provider cost comparison for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostAllocation> GetCostAllocationAsync(CostAllocationRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting cost allocation for user {UserId}", userId);
+
+            // This would typically calculate cost allocation based on actual usage
+            // For now, return simulated allocation
+            var allocation = new CostAllocation
+            {
+                TotalCost = 1250.75m,
+                Currency = request.Currency,
+                AllocationMethod = request.AllocationMethod,
+                Allocations = new List<CostAllocationItem>
+                {
+                    new()
+                    {
+                        EntityId = "team-frontend",
+                        EntityName = "Frontend Team",
+                        EntityType = "team",
+                        AllocatedCost = 625.38m,
+                        AllocationPercentage = 50.0,
+                        AllocationBasis = "Usage-based allocation"
+                    },
+                    new()
+                    {
+                        EntityId = "team-backend",
+                        EntityName = "Backend Team",
+                        EntityType = "team",
+                        AllocatedCost = 375.23m,
+                        AllocationPercentage = 30.0,
+                        AllocationBasis = "Usage-based allocation"
+                    },
+                    new()
+                    {
+                        EntityId = "team-ml",
+                        EntityName = "ML Team",
+                        EntityType = "team",
+                        AllocatedCost = 250.14m,
+                        AllocationPercentage = 20.0,
+                        AllocationBasis = "Usage-based allocation"
+                    }
+                },
+                AllocationRules = new List<string>
+                {
+                    "Allocate based on API usage volume"
+                }
+            };
+
+            return allocation;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost allocation for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<CostCenter> CreateCostCenterAsync(CreateCostCenterRequest request, string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Creating cost center for user {UserId}", userId);
+
+            var costCenter = new CostCenter
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = request.Name,
+                Description = request.Description,
+                ManagerUserId = request.ManagerUserId,
+                BudgetLimit = request.BudgetLimit,
+                Currency = request.Currency,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                Tags = request.Tags ?? new List<string>(),
+                AllocationRules = request.AllocationRules ?? new List<AllocationRule>()
+            };
+
+            return await _repository.CreateCostCenterAsync(costCenter);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create cost center for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<CostCenter>> GetCostCentersAsync(string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting cost centers for user {UserId}", userId);
+            return await _repository.GetCostCentersAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get cost centers for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<RealTimeCostData> GetRealTimeCostDataAsync(string userId)
+    {
+        try
+        {
+            _logger.LogInformation("Getting real-time cost data for user {UserId}", userId);
+
+            // This would typically query real-time cost tracking systems
+            // For now, return simulated real-time data
+            var realTimeData = new RealTimeCostData
+            {
+                CurrentCost = 45.67m,
+                Currency = "USD",
+                LastUpdated = DateTime.UtcNow,
+                TodaysCost = 45.67m,
+                YesterdaysCost = 42.15m,
+                MonthToDateCost = 1250.75m,
+                DailyBudget = 50.00m,
+                MonthlyBudget = 1500.00m,
+                BudgetUtilization = 83.4,
+                CostVelocity = 1.85m, // Cost per hour
+                ProjectedDailyCost = 48.20m,
+                ProjectedMonthlyCost = 1446.00m,
+                TopCostDrivers = new List<CostDriver>
+                {
+                    new() { Name = "GPT-4 API", Cost = 25.30m, Percentage = 55.4 },
+                    new() { Name = "GPT-3.5 API", Cost = 12.15m, Percentage = 26.6 },
+                    new() { Name = "Embeddings", Cost = 8.22m, Percentage = 18.0 }
+                },
+                RecentTransactions = new List<RecentTransaction>
+                {
+                    new()
+                    {
+                        Timestamp = DateTime.UtcNow.AddMinutes(-5),
+                        Description = "GPT-4 completion request",
+                        Cost = 0.15m,
+                        Provider = "OpenAI",
+                        ModelId = "gpt-4"
+                    },
+                    new()
+                    {
+                        Timestamp = DateTime.UtcNow.AddMinutes(-8),
+                        Description = "Text embedding request",
+                        Cost = 0.02m,
+                        Provider = "OpenAI",
+                        ModelId = "text-embedding-ada-002"
+                    }
+                }
+            };
+
+            return realTimeData;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get real-time cost data for user {UserId}", userId);
+            throw;
+        }
     }
 
     #endregion

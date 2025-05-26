@@ -238,4 +238,257 @@ public class FineTuningController : BaseApiController
         var content = await _fineTuningService.GetFileContentAsync(id, userId);
         return Ok(content);
     }
+
+    // Phase 3 Advanced Fine-Tuning Features
+
+    /// <summary>
+    /// Get fine-tuning analytics
+    /// </summary>
+    /// <param name="startDate">Start date</param>
+    /// <param name="endDate">End date</param>
+    /// <returns>Fine-tuning analytics</returns>
+    [HttpGet("analytics")]
+    [ProducesResponseType(typeof(FineTuningAnalytics), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetAnalytics([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var analytics = await _fineTuningService.GetAnalyticsAsync(userId, startDate, endDate);
+            return Ok(analytics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get fine-tuning analytics");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get cost breakdown for fine-tuning
+    /// </summary>
+    /// <param name="startDate">Start date</param>
+    /// <param name="endDate">End date</param>
+    /// <returns>Cost breakdown</returns>
+    [HttpGet("cost-breakdown")]
+    [ProducesResponseType(typeof(FineTuningCostBreakdown), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetCostBreakdown([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var breakdown = await _fineTuningService.GetCostBreakdownAsync(userId, startDate, endDate);
+            return Ok(breakdown);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get fine-tuning cost breakdown");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Estimate fine-tuning cost
+    /// </summary>
+    /// <param name="request">Cost estimation request</param>
+    /// <returns>Cost estimate</returns>
+    [HttpPost("estimate-cost")]
+    [ProducesResponseType(typeof(FineTuningCostEstimate), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> EstimateCost([FromBody] EstimateFineTuningCostRequest request)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var estimate = await _fineTuningService.EstimateCostAsync(request, userId);
+            return Ok(estimate);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to estimate fine-tuning cost");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Compare model performance
+    /// </summary>
+    /// <param name="baseModelId">Base model ID</param>
+    /// <param name="fineTunedModelId">Fine-tuned model ID</param>
+    /// <returns>Performance comparison</returns>
+    [HttpGet("compare/{baseModelId}/{fineTunedModelId}")]
+    [ProducesResponseType(typeof(ModelPerformanceComparison), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CompareModelPerformance(string baseModelId, string fineTunedModelId)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var comparison = await _fineTuningService.CompareModelPerformanceAsync(baseModelId, fineTunedModelId, userId);
+            return Ok(comparison);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to compare model performance");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get fine-tuning recommendations
+    /// </summary>
+    /// <param name="useCase">Use case description</param>
+    /// <returns>Recommendations</returns>
+    [HttpGet("recommendations")]
+    [ProducesResponseType(typeof(FineTuningRecommendations), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetRecommendations([FromQuery] string useCase)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var recommendations = await _fineTuningService.GetRecommendationsAsync(userId, useCase);
+            return Ok(recommendations);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get fine-tuning recommendations");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Validate data quality
+    /// </summary>
+    /// <param name="fileId">File ID</param>
+    /// <returns>Data quality report</returns>
+    [HttpPost("validate-data/{fileId}")]
+    [ProducesResponseType(typeof(DataQualityReport), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ValidateDataQuality(string fileId)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var report = await _fineTuningService.ValidateDataQualityAsync(fileId, userId);
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to validate data quality for file {FileId}", fileId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get fine-tuning templates
+    /// </summary>
+    /// <param name="provider">Provider name</param>
+    /// <param name="useCase">Use case</param>
+    /// <returns>Templates</returns>
+    [HttpGet("templates")]
+    [ProducesResponseType(typeof(IEnumerable<FineTuningTemplate>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetTemplates([FromQuery] string provider, [FromQuery] string useCase)
+    {
+        try
+        {
+            var templates = await _fineTuningService.GetTemplatesAsync(provider, useCase);
+            return Ok(templates);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get fine-tuning templates");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Create job from template
+    /// </summary>
+    /// <param name="templateId">Template ID</param>
+    /// <param name="request">Job creation request</param>
+    /// <returns>Created job</returns>
+    [HttpPost("templates/{templateId}/create-job")]
+    [ProducesResponseType(typeof(FineTuningJob), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CreateJobFromTemplate(string templateId, [FromBody] CreateJobFromTemplateRequest request)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var job = await _fineTuningService.CreateJobFromTemplateAsync(templateId, request, userId);
+            return CreatedAtAction(nameof(GetJobInsights), new { jobId = job.Id }, job);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create job from template {TemplateId}", templateId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get job insights
+    /// </summary>
+    /// <param name="jobId">Job ID</param>
+    /// <returns>Job insights</returns>
+    [HttpGet("jobs/{jobId}/insights")]
+    [ProducesResponseType(typeof(FineTuningJobInsights), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetJobInsights(string jobId)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var insights = await _fineTuningService.GetJobInsightsAsync(jobId, userId);
+            return Ok(insights);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get job insights for {JobId}", jobId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Export job data
+    /// </summary>
+    /// <param name="jobId">Job ID</param>
+    /// <param name="format">Export format</param>
+    /// <returns>Export data</returns>
+    [HttpGet("jobs/{jobId}/export")]
+    [ProducesResponseType(typeof(LLMGateway.Core.Models.Analytics.ExportData), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ExportJobData(string jobId, [FromQuery] LLMGateway.Core.Models.Analytics.ExportFormat format = LLMGateway.Core.Models.Analytics.ExportFormat.Json)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var exportData = await _fineTuningService.ExportJobDataAsync(jobId, format, userId);
+            return Ok(exportData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export job data for {JobId}", jobId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
 }

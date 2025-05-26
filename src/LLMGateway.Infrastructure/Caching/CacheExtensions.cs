@@ -21,26 +21,38 @@ public static class CacheExtensions
     {
         var connectionString = configuration.GetValue<string>("Redis:ConnectionString");
         var instanceName = configuration.GetValue<string>("Redis:InstanceName") ?? "LLMGateway:";
-        
+
         if (string.IsNullOrEmpty(connectionString))
         {
             // Use in-memory cache if Redis is not configured
             services.AddMemoryCache();
+
+            // Register IDistributedCache for EnhancedCacheService
+            services.AddDistributedMemoryCache();
+
+            // Register custom ICacheService
             services.AddSingleton<ICacheService, InMemoryCacheService>();
             return services;
         }
-        
-        // Configure Redis
+
+        // Configure Redis for IDistributedCache (used by EnhancedCacheService)
+        services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = connectionString;
+            options.InstanceName = instanceName;
+        });
+
+        // Configure Redis for custom ICacheService
         services.AddSingleton<IConnectionMultiplexer>(sp =>
             ConnectionMultiplexer.Connect(connectionString));
-        
+
         services.AddSingleton<ICacheService>(sp =>
         {
             var redis = sp.GetRequiredService<IConnectionMultiplexer>();
             var logger = sp.GetRequiredService<ILogger<RedisCacheService>>();
             return new RedisCacheService(redis, logger, instanceName);
         });
-        
+
         return services;
     }
 }

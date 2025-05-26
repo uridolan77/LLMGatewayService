@@ -1,21 +1,23 @@
-using LLMGateway.Core.Exceptions;
-using LLMGateway.Core.Models.Completion;
-using LLMGateway.Core.Models.Embedding;
-using LLMGateway.Core.Models.Provider;
-using LLMGateway.Providers.Base;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LLMGateway.Core.Exceptions;
+using LLMGateway.Core.Interfaces;
+using LLMGateway.Core.Models.Completion;
+using LLMGateway.Core.Models.Embedding;
+using LLMGateway.Core.Models.Provider;
+using LLMGateway.Providers.Base;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace LLMGateway.Providers.Cohere;
 
 /// <summary>
-/// Provider for Cohere
+/// Enhanced Cohere provider with integrated Phase 1 and Phase 2 capabilities
 /// </summary>
 public class CohereProvider : BaseLLMProvider
 {
@@ -24,25 +26,35 @@ public class CohereProvider : BaseLLMProvider
     private readonly JsonSerializerOptions _jsonOptions;
 
     /// <summary>
-    /// Constructor
+    /// Constructor with enhanced services
     /// </summary>
     /// <param name="httpClient">HTTP client</param>
     /// <param name="options">Cohere options</param>
     /// <param name="logger">Logger</param>
+    /// <param name="circuitBreakerService">Circuit breaker service</param>
+    /// <param name="tokenCountingService">Token counting service</param>
+    /// <param name="cacheService">Enhanced cache service</param>
+    /// <param name="contentFilteringService">Content filtering service</param>
+    /// <param name="metricsService">Metrics service</param>
     public CohereProvider(
         HttpClient httpClient,
         IOptions<CohereOptions> options,
-        ILogger<CohereProvider> logger)
-        : base(logger)
+        ILogger<CohereProvider> logger,
+        ICircuitBreakerService circuitBreakerService,
+        ITokenCountingService tokenCountingService,
+        IEnhancedCacheService cacheService,
+        IContentFilteringService contentFilteringService,
+        IMetricsService metricsService)
+        : base(logger, circuitBreakerService, tokenCountingService, cacheService, contentFilteringService, metricsService)
     {
         _httpClient = httpClient;
         _options = options.Value;
-        
+
         // Configure the HTTP client
         _httpClient.BaseAddress = new Uri(_options.ApiUrl);
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
         _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds);
-        
+
         // Configure JSON options
         _jsonOptions = new JsonSerializerOptions
         {
@@ -130,7 +142,7 @@ public class CohereProvider : BaseLLMProvider
                     SupportsVision = false
                 }
             };
-            
+
             return models;
         }
         catch (Exception ex)
@@ -150,18 +162,18 @@ public class CohereProvider : BaseLLMProvider
             {
                 providerModelId = modelId.Substring("cohere.".Length);
             }
-            
+
             // Cohere doesn't have a get model endpoint, so we'll return a hardcoded model
             var models = await GetModelsAsync();
-            var model = models.FirstOrDefault(m => 
-                m.Id == modelId || 
+            var model = models.FirstOrDefault(m =>
+                m.Id == modelId ||
                 m.ProviderModelId == providerModelId);
-            
+
             if (model == null)
             {
                 throw new ProviderException(Name, $"Model {modelId} not found");
             }
-            
+
             return model;
         }
         catch (Exception ex)
@@ -173,30 +185,45 @@ public class CohereProvider : BaseLLMProvider
     /// <inheritdoc/>
     public override async Task<CompletionResponse> CreateCompletionAsync(CompletionRequest request, CancellationToken cancellationToken = default)
     {
+        return await CreateEnhancedCompletionAsync(request, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<CompletionResponse> CreateCompletionInternalAsync(CompletionRequest request, CancellationToken cancellationToken = default)
+    {
+        using var activity = new Activity("Cohere.CreateCompletionInternal").Start();
+        activity?.SetTag("model", request.ModelId);
+
         try
         {
+            Logger.LogDebug("Creating Cohere completion for model {ModelId}", request.ModelId);
+
             // Convert the request to Cohere format
             var cohereRequest = ConvertToCohereChatRequest(request);
-            
+
             // Send the request
             var response = await _httpClient.PostAsJsonAsync("/v1/chat", cohereRequest, _jsonOptions, cancellationToken);
-            
+
             // Check for errors
             response.EnsureSuccessStatusCode();
-            
+
             // Parse the response
             var cohereResponse = await response.Content.ReadFromJsonAsync<CohereChatResponse>(_jsonOptions, cancellationToken);
-            
+
             if (cohereResponse == null)
             {
                 throw new ProviderException(Name, "Failed to create completion: Empty response");
             }
-            
+
             // Convert the response to the standard format
-            return ConvertFromCohereChatResponse(cohereResponse, request.ModelId);
+            var standardResponse = ConvertFromCohereChatResponse(cohereResponse, request.ModelId);
+
+            Logger.LogDebug("Cohere completion created successfully for model {ModelId}", request.ModelId);
+            return standardResponse;
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Cohere completion failed for model {ModelId}", request.ModelId);
             throw HandleProviderException(ex, "Failed to create completion");
         }
     }
@@ -206,16 +233,27 @@ public class CohereProvider : BaseLLMProvider
         CompletionRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        await foreach (var response in CreateEnhancedCompletionStreamAsync(request, cancellationToken))
+        {
+            yield return response;
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async IAsyncEnumerable<CompletionResponse> CreateCompletionStreamInternalAsync(
+        CompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
         List<CompletionResponse> bufferedResponses = new List<CompletionResponse>();
-        
+
         try
         {
             // Convert the request to Cohere format
             var cohereRequest = ConvertToCohereChatRequest(request);
-            
+
             // Ensure streaming is enabled
             cohereRequest.Stream = true;
-            
+
             // Create the HTTP request
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/v1/chat")
             {
@@ -224,24 +262,24 @@ public class CohereProvider : BaseLLMProvider
                     Encoding.UTF8,
                     "application/json")
             };
-            
+
             // Send the request
             var response = await _httpClient.SendAsync(
-                httpRequest, 
-                HttpCompletionOption.ResponseHeadersRead, 
+                httpRequest,
+                HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
-            
+
             // Check for errors
             response.EnsureSuccessStatusCode();
-            
+
             // Read the streaming response
             using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var reader = new StreamReader(stream);
-            
+
             string? line;
             string accumulatedText = "";
             CohereChatResponse? fullResponse = null;
-            
+
             while ((line = await reader.ReadLineAsync()) != null)
             {
                 // Skip empty lines
@@ -249,25 +287,25 @@ public class CohereProvider : BaseLLMProvider
                 {
                     continue;
                 }
-                
+
                 // Parse the SSE data
                 if (line.StartsWith("data: "))
                 {
                     var json = line.Substring("data: ".Length);
-                    
+
                     // Skip [DONE] message
                     if (json == "[DONE]")
                     {
                         continue;
                     }
-                    
+
                     CompletionResponse? standardResponse = null;
                     bool parseSuccess = false;
-                    
+
                     try
                     {
                         var chunkResponse = JsonSerializer.Deserialize<CohereChatResponse>(json, _jsonOptions);
-                        
+
                         if (chunkResponse != null)
                         {
                             // For the first chunk, store the full response
@@ -275,11 +313,11 @@ public class CohereProvider : BaseLLMProvider
                             {
                                 fullResponse = chunkResponse;
                             }
-                            
+
                             // Accumulate text for delta
                             var deltaText = chunkResponse.Text.Substring(accumulatedText.Length);
                             accumulatedText = chunkResponse.Text;
-                            
+
                             // Create a response with just the delta
                             var deltaResponse = new CohereChatResponse
                             {
@@ -289,7 +327,7 @@ public class CohereProvider : BaseLLMProvider
                                 ToolCalls = chunkResponse.ToolCalls,
                                 TokenCount = chunkResponse.TokenCount
                             };
-                            
+
                             // Convert the chunk to a standard response
                             standardResponse = ConvertFromCohereChatResponse(deltaResponse, request.ModelId, true, accumulatedText);
                             parseSuccess = true;
@@ -299,7 +337,7 @@ public class CohereProvider : BaseLLMProvider
                     {
                         Logger.LogWarning(ex, "Failed to parse streaming response chunk: {Json}", json);
                     }
-                    
+
                     // Add the response to our buffer if parsing was successful
                     if (parseSuccess && standardResponse != null)
                     {
@@ -312,7 +350,7 @@ public class CohereProvider : BaseLLMProvider
         {
             throw HandleProviderException(ex, "Failed to create streaming completion");
         }
-        
+
         // Return the buffered responses outside the try-catch block
         foreach (var response in bufferedResponses)
         {
@@ -327,21 +365,21 @@ public class CohereProvider : BaseLLMProvider
         {
             // Convert the request to Cohere format
             var cohereRequest = ConvertToCohereEmbeddingRequest(request);
-            
+
             // Send the request
             var response = await _httpClient.PostAsJsonAsync("/v1/embed", cohereRequest, _jsonOptions, cancellationToken);
-            
+
             // Check for errors
             response.EnsureSuccessStatusCode();
-            
+
             // Parse the response
             var cohereResponse = await response.Content.ReadFromJsonAsync<CohereEmbeddingResponse>(_jsonOptions, cancellationToken);
-            
+
             if (cohereResponse == null)
             {
                 throw new ProviderException(Name, "Failed to create embedding: Empty response");
             }
-            
+
             // Convert the response to the standard format
             return ConvertFromCohereEmbeddingResponse(cohereResponse, request.ModelId);
         }
@@ -354,14 +392,33 @@ public class CohereProvider : BaseLLMProvider
     /// <inheritdoc/>
     public override async Task<bool> IsAvailableAsync()
     {
+        using var activity = new Activity("Cohere.HealthCheck").Start();
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
+            Logger.LogDebug("Checking Cohere provider availability");
+
             // Cohere doesn't have a health check endpoint, so we'll make a simple request
             var response = await _httpClient.GetAsync("/v1/models").ConfigureAwait(false);
-            return response.IsSuccessStatusCode;
+            var isHealthy = response.IsSuccessStatusCode;
+
+            stopwatch.Stop();
+            MetricsService.RecordProviderHealth(Name, isHealthy, stopwatch.Elapsed.TotalMilliseconds);
+
+            Logger.LogDebug("Cohere provider health check completed: {IsHealthy} ({Duration}ms)",
+                isHealthy, stopwatch.Elapsed.TotalMilliseconds);
+
+            return isHealthy;
         }
-        catch
+        catch (Exception ex)
         {
+            stopwatch.Stop();
+            MetricsService.RecordProviderHealth(Name, false, stopwatch.Elapsed.TotalMilliseconds);
+
+            Logger.LogWarning(ex, "Cohere provider health check failed ({Duration}ms)",
+                stopwatch.Elapsed.TotalMilliseconds);
+
             return false;
         }
     }
@@ -374,11 +431,11 @@ public class CohereProvider : BaseLLMProvider
         {
             throw new ProviderException(Name, "No user message found in the request");
         }
-        
+
         // Convert the rest of the messages to chat history
         var chatHistory = new List<CohereChatMessage>();
         bool skipLastUserMessage = false;
-        
+
         foreach (var message in request.Messages)
         {
             // Skip the last user message as it's the main message
@@ -387,7 +444,7 @@ public class CohereProvider : BaseLLMProvider
                 skipLastUserMessage = true;
                 continue;
             }
-            
+
             // Map roles
             var role = message.Role;
             if (role == "system")
@@ -406,7 +463,7 @@ public class CohereProvider : BaseLLMProvider
             {
                 role = "TOOL";
             }
-            
+
             chatHistory.Add(new CohereChatMessage
             {
                 Role = role,
@@ -420,7 +477,7 @@ public class CohereProvider : BaseLLMProvider
                 ToolCallId = message.ToolCallId
             });
         }
-        
+
         return new CohereChatRequest
         {
             Model = request.ModelId,
@@ -452,7 +509,7 @@ public class CohereProvider : BaseLLMProvider
                 Content = response.Text
             };
         }
-        
+
         return new CompletionResponse
         {
             Id = response.GenerationId,
@@ -497,7 +554,7 @@ public class CohereProvider : BaseLLMProvider
     {
         // Convert the input to a list of strings
         List<string> texts;
-        
+
         if (request.Input is string stringInput)
         {
             texts = new List<string> { stringInput };
@@ -510,7 +567,7 @@ public class CohereProvider : BaseLLMProvider
         {
             texts = new List<string> { JsonSerializer.Serialize(request.Input) };
         }
-        
+
         return new CohereEmbeddingRequest
         {
             Model = request.ModelId,
@@ -523,7 +580,7 @@ public class CohereProvider : BaseLLMProvider
     private EmbeddingResponse ConvertFromCohereEmbeddingResponse(CohereEmbeddingResponse response, string modelId)
     {
         var embeddingData = new List<EmbeddingData>();
-        
+
         for (int i = 0; i < response.Embeddings.Count; i++)
         {
             embeddingData.Add(new EmbeddingData
@@ -533,7 +590,7 @@ public class CohereProvider : BaseLLMProvider
                 Embedding = response.Embeddings[i]
             });
         }
-        
+
         return new EmbeddingResponse
         {
             Object = "list",

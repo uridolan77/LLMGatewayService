@@ -1,21 +1,23 @@
-using LLMGateway.Core.Exceptions;
-using LLMGateway.Core.Models.Completion;
-using LLMGateway.Core.Models.Embedding;
-using LLMGateway.Core.Models.Provider;
-using LLMGateway.Providers.Base;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LLMGateway.Core.Exceptions;
+using LLMGateway.Core.Interfaces;
+using LLMGateway.Core.Models.Completion;
+using LLMGateway.Core.Models.Embedding;
+using LLMGateway.Core.Models.Provider;
+using LLMGateway.Providers.Base;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace LLMGateway.Providers.OpenAI;
 
 /// <summary>
-/// Provider for OpenAI
+/// Enhanced OpenAI provider with integrated Phase 1 and Phase 2 capabilities
 /// </summary>
 public class OpenAIProvider : BaseLLMProvider
 {
@@ -24,31 +26,41 @@ public class OpenAIProvider : BaseLLMProvider
     private readonly JsonSerializerOptions _jsonOptions;
 
     /// <summary>
-    /// Constructor
+    /// Constructor with enhanced services
     /// </summary>
     /// <param name="httpClient">HTTP client</param>
     /// <param name="options">OpenAI options</param>
     /// <param name="logger">Logger</param>
+    /// <param name="circuitBreakerService">Circuit breaker service</param>
+    /// <param name="tokenCountingService">Token counting service</param>
+    /// <param name="cacheService">Enhanced cache service</param>
+    /// <param name="contentFilteringService">Content filtering service</param>
+    /// <param name="metricsService">Metrics service</param>
     public OpenAIProvider(
         HttpClient httpClient,
         IOptions<OpenAIOptions> options,
-        ILogger<OpenAIProvider> logger)
-        : base(logger)
+        ILogger<OpenAIProvider> logger,
+        ICircuitBreakerService circuitBreakerService,
+        ITokenCountingService tokenCountingService,
+        IEnhancedCacheService cacheService,
+        IContentFilteringService contentFilteringService,
+        IMetricsService metricsService)
+        : base(logger, circuitBreakerService, tokenCountingService, cacheService, contentFilteringService, metricsService)
     {
         _httpClient = httpClient;
         _options = options.Value;
-        
+
         // Configure the HTTP client
         _httpClient.BaseAddress = new Uri(_options.ApiUrl);
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
-        
+
         if (!string.IsNullOrEmpty(_options.OrganizationId))
         {
             _httpClient.DefaultRequestHeaders.Add("OpenAI-Organization", _options.OrganizationId);
         }
-        
+
         _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds);
-        
+
         // Configure JSON options
         _jsonOptions = new JsonSerializerOptions
         {
@@ -67,12 +79,12 @@ public class OpenAIProvider : BaseLLMProvider
         try
         {
             var response = await _httpClient.GetFromJsonAsync<OpenAIListModelsResponse>("/models", _jsonOptions).ConfigureAwait(false);
-            
+
             if (response == null || response.Data == null)
             {
                 throw new ProviderException(Name, "Failed to get models: Empty response");
             }
-            
+
             return response.Data.Select(m => new ModelInfo
             {
                 Id = $"openai.{m.Id}",
@@ -104,14 +116,14 @@ public class OpenAIProvider : BaseLLMProvider
             {
                 providerModelId = modelId.Substring("openai.".Length);
             }
-            
+
             var response = await _httpClient.GetFromJsonAsync<OpenAIModel>($"/models/{providerModelId}", _jsonOptions).ConfigureAwait(false);
-            
+
             if (response == null)
             {
                 throw new ProviderException(Name, $"Failed to get model {modelId}: Empty response");
             }
-            
+
             return new ModelInfo
             {
                 Id = $"openai.{response.Id}",
@@ -135,49 +147,81 @@ public class OpenAIProvider : BaseLLMProvider
     /// <inheritdoc/>
     public override async Task<CompletionResponse> CreateCompletionAsync(CompletionRequest request, CancellationToken cancellationToken = default)
     {
+        return await CreateEnhancedCompletionAsync(request, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<CompletionResponse> CreateCompletionInternalAsync(CompletionRequest request, CancellationToken cancellationToken = default)
+    {
+        using var activity = new Activity("OpenAI.CreateCompletionInternal").Start();
+        activity?.SetTag("model", request.ModelId);
+
         try
         {
+            Logger.LogDebug("Creating OpenAI completion for model {ModelId}", request.ModelId);
+
             // Convert the request to OpenAI format
             var openAIRequest = ConvertToOpenAICompletionRequest(request);
-            
+
             // Send the request
             var response = await _httpClient.PostAsJsonAsync("/chat/completions", openAIRequest, _jsonOptions, cancellationToken).ConfigureAwait(false);
-            
+
             // Check for errors
             response.EnsureSuccessStatusCode();
-            
+
             // Parse the response
             var openAIResponse = await response.Content.ReadFromJsonAsync<OpenAIChatCompletionResponse>(_jsonOptions, cancellationToken).ConfigureAwait(false);
-            
+
             if (openAIResponse == null)
             {
                 throw new ProviderException(Name, "Failed to create completion: Empty response");
             }
-            
+
             // Convert the response to the standard format
-            return ConvertFromOpenAICompletionResponse(openAIResponse);
+            var standardResponse = ConvertFromOpenAICompletionResponse(openAIResponse);
+
+            Logger.LogDebug("OpenAI completion created successfully for model {ModelId}", request.ModelId);
+            return standardResponse;
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "OpenAI completion failed for model {ModelId}", request.ModelId);
             throw HandleProviderException(ex, "Failed to create completion");
         }
     }
 
     /// <inheritdoc/>
     public override async IAsyncEnumerable<CompletionResponse> CreateCompletionStreamAsync(
-        CompletionRequest request, 
+        CompletionRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        await foreach (var response in CreateEnhancedCompletionStreamAsync(request, cancellationToken))
+        {
+            yield return response;
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override async IAsyncEnumerable<CompletionResponse> CreateCompletionStreamInternalAsync(
+        CompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using var activity = new Activity("OpenAI.CreateCompletionStreamInternal").Start();
+        activity?.SetTag("model", request.ModelId);
+        activity?.SetTag("streaming", true);
+
         List<CompletionResponse> bufferedResponses = new List<CompletionResponse>();
-        
+
         try
         {
+            Logger.LogDebug("Creating OpenAI streaming completion for model {ModelId}", request.ModelId);
+
             // Convert the request to OpenAI format
             var openAIRequest = ConvertToOpenAICompletionRequest(request);
-            
+
             // Ensure streaming is enabled
             openAIRequest.Stream = true;
-            
+
             // Create the HTTP request
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/chat/completions")
             {
@@ -186,20 +230,20 @@ public class OpenAIProvider : BaseLLMProvider
                     Encoding.UTF8,
                     "application/json")
             };
-            
+
             // Send the request
             var response = await _httpClient.SendAsync(
-                httpRequest, 
-                HttpCompletionOption.ResponseHeadersRead, 
+                httpRequest,
+                HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken).ConfigureAwait(false);
-            
+
             // Check for errors
             response.EnsureSuccessStatusCode();
-            
+
             // Read the streaming response
             using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             using var reader = new StreamReader(stream);
-            
+
             string? line;
             while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
             {
@@ -208,16 +252,16 @@ public class OpenAIProvider : BaseLLMProvider
                 {
                     continue;
                 }
-                
+
                 // Parse the SSE data
                 if (line.StartsWith("data: "))
                 {
                     var json = line.Substring("data: ".Length);
-                    
+
                     try
                     {
                         var chunkResponse = JsonSerializer.Deserialize<OpenAIChatCompletionResponse>(json, _jsonOptions);
-                        
+
                         if (chunkResponse != null)
                         {
                             var standardResponse = ConvertFromOpenAICompletionResponse(chunkResponse);
@@ -230,12 +274,16 @@ public class OpenAIProvider : BaseLLMProvider
                     }
                 }
             }
+
+            Logger.LogDebug("OpenAI streaming completion completed for model {ModelId} with {ChunkCount} chunks",
+                request.ModelId, bufferedResponses.Count);
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "OpenAI streaming completion failed for model {ModelId}", request.ModelId);
             throw HandleProviderException(ex, "Failed to create streaming completion");
         }
-        
+
         // Return all buffered responses outside of the try-catch block
         foreach (var response in bufferedResponses)
         {
@@ -250,21 +298,21 @@ public class OpenAIProvider : BaseLLMProvider
         {
             // Convert the request to OpenAI format
             var openAIRequest = ConvertToOpenAIEmbeddingRequest(request);
-            
+
             // Send the request
             var response = await _httpClient.PostAsJsonAsync("/embeddings", openAIRequest, _jsonOptions, cancellationToken);
-            
+
             // Check for errors
             response.EnsureSuccessStatusCode();
-            
+
             // Parse the response
             var openAIResponse = await response.Content.ReadFromJsonAsync<OpenAIEmbeddingResponse>(_jsonOptions, cancellationToken);
-            
+
             if (openAIResponse == null)
             {
                 throw new ProviderException(Name, "Failed to create embedding: Empty response");
             }
-            
+
             // Convert the response to the standard format
             return ConvertFromOpenAIEmbeddingResponse(openAIResponse);
         }
@@ -277,13 +325,32 @@ public class OpenAIProvider : BaseLLMProvider
     /// <inheritdoc/>
     public override async Task<bool> IsAvailableAsync()
     {
+        using var activity = new Activity("OpenAI.HealthCheck").Start();
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
+            Logger.LogDebug("Checking OpenAI provider availability");
+
             var response = await _httpClient.GetAsync("/models").ConfigureAwait(false);
-            return response.IsSuccessStatusCode;
+            var isHealthy = response.IsSuccessStatusCode;
+
+            stopwatch.Stop();
+            MetricsService.RecordProviderHealth(Name, isHealthy, stopwatch.Elapsed.TotalMilliseconds);
+
+            Logger.LogDebug("OpenAI provider health check completed: {IsHealthy} ({Duration}ms)",
+                isHealthy, stopwatch.Elapsed.TotalMilliseconds);
+
+            return isHealthy;
         }
-        catch
+        catch (Exception ex)
         {
+            stopwatch.Stop();
+            MetricsService.RecordProviderHealth(Name, false, stopwatch.Elapsed.TotalMilliseconds);
+
+            Logger.LogWarning(ex, "OpenAI provider health check failed ({Duration}ms)",
+                stopwatch.Elapsed.TotalMilliseconds);
+
             return false;
         }
     }

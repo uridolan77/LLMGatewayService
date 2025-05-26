@@ -1,4 +1,5 @@
 using LLMGateway.Core.Exceptions;
+using LLMGateway.Core.Interfaces;
 using LLMGateway.Core.Models.Completion;
 using LLMGateway.Core.Models.Embedding;
 using LLMGateway.Core.Models.Provider;
@@ -31,12 +32,22 @@ public class AzureOpenAIProvider : BaseLLMProvider
     /// <param name="httpClientFactory">HTTP client factory</param>
     /// <param name="options">Azure OpenAI options</param>
     /// <param name="logger">Logger</param>
+    /// <param name="circuitBreakerService">Circuit breaker service</param>
+    /// <param name="tokenCountingService">Token counting service</param>
+    /// <param name="cacheService">Cache service</param>
+    /// <param name="contentFilteringService">Content filtering service</param>
+    /// <param name="metricsService">Metrics service</param>
     public AzureOpenAIProvider(
         HttpClient httpClient,
         IHttpClientFactory httpClientFactory,
         IOptions<AzureOpenAIOptions> options,
-        ILogger<AzureOpenAIProvider> logger)
-        : base(logger)
+        ILogger<AzureOpenAIProvider> logger,
+        ICircuitBreakerService circuitBreakerService,
+        ITokenCountingService tokenCountingService,
+        IEnhancedCacheService cacheService,
+        IContentFilteringService contentFilteringService,
+        IMetricsService metricsService)
+        : base(logger, circuitBreakerService, tokenCountingService, cacheService, contentFilteringService, metricsService)
     {
         _httpClient = httpClient;
         _httpClientFactory = httpClientFactory;
@@ -129,6 +140,12 @@ public class AzureOpenAIProvider : BaseLLMProvider
     /// <inheritdoc/>
     public override async Task<CompletionResponse> CreateCompletionAsync(CompletionRequest request, CancellationToken cancellationToken = default)
     {
+        return await CreateEnhancedCompletionAsync(request, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<CompletionResponse> CreateCompletionInternalAsync(CompletionRequest request, CancellationToken cancellationToken = default)
+    {
         try
         {
             // Extract the deployment ID from the model ID
@@ -178,6 +195,14 @@ public class AzureOpenAIProvider : BaseLLMProvider
 
     /// <inheritdoc/>
     public override IAsyncEnumerable<CompletionResponse> CreateCompletionStreamAsync(
+        CompletionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return CreateEnhancedCompletionStreamAsync(request, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override IAsyncEnumerable<CompletionResponse> CreateCompletionStreamInternalAsync(
         CompletionRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
